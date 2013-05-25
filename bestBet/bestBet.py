@@ -111,6 +111,7 @@ def bestBet():
     #plt.legend(betLines.mainLines(), betLines.labels, loc='upper right')
     axPlot.legend()
     plt.show()
+    raw_input()
 
 
 if __name__ == "__main__":
