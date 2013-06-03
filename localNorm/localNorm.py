@@ -1,7 +1,16 @@
 import numpy as np
-from matplotlib import cm as cm, pyplot as plt, widgets as widgets
 from scipy import misc
+import math
+from matplotlib import cm as cm, pyplot as plt, widgets as widgets
 import sys
+
+'''
+The whole mess of organizing subplots in this script
+can be easily overcomed if we use AxesGrid and/or gridspec.
+However that requires matplotlib > v1.0,
+but by default, I only have matplotlib 0.99.
+So the code is a little messy.
+'''
 
 def readImage(imgFile):
    img = misc.imread(imgFile)
@@ -48,7 +57,7 @@ def scanSameMap(img, n, power = 1, computeMean = False, means = None):
             output[y, x, :] /= (endY - startY)*(endX - startX)
    return output
 
-class ImageNormalizer:
+class ImageNormalizer(object):
 
    def __init__(self, img):
       self.img = img
@@ -91,9 +100,9 @@ class ImageNormalizer:
       normFunc(n, k, alpha, beta, scanFunc)
       return self.output
 
-class NomalizationVisualizer:
-
-   def __init__(self, imgFile, normType, n, k, alpha, beta):
+class NormDisplayAxes(object):
+   def __init__(self, fig, imgFile, counts, location, size, normType, n, k, logAlpha, beta):
+      #print imgFile, " at ", "[%d, %d]" % (location[0], location[1]), ", size = [%.3f, %.3f]" % (size[0], size[1])
       self.imgSrc = readImage(imgFile)
       
       # make 3 dimensional image. Feed it to the normalizer
@@ -103,11 +112,49 @@ class NomalizationVisualizer:
          img = np.reshape(img, [img.shape[0], img.shape[1], 1])
       self.imgNormalizer = ImageNormalizer(img)
 
+      margins = [0.05, 0.25]
+      self.axImageOrigin = fig.add_subplot(counts[1], counts[0]*3, (counts[1] - location[1] - 1)*counts[0]*3 + location[0]*3 + 1)
+      self.axImageNormed = fig.add_subplot(counts[1], counts[0]*3, (counts[1] - location[1] - 1)*counts[0]*3 + location[0]*3 + 2)
+      self.axColorBar = fig.add_subplot(counts[1], counts[0]*3, (counts[1] - location[1] - 1)*counts[0]*3 + location[0]*3 + 3)
+
+      self.axImageOrigin.set_position([margins[0] + size[0]*location[0], margins[1] + size[1]*location[1], 0.4*size[0], size[1]])
+      self.axImageNormed.set_position([margins[0] + size[0]*location[0] + 0.41*size[0], margins[1] + size[1]*location[1], 0.4*size[0], size[1]])
+      self.axColorBar.set_position([margins[0] + size[0]*location[0] + 0.82*size[0], margins[1] + size[1]*location[1] + 0.2*size[1], 0.02*size[0], 0.6*size[1]])
+      #self.axImageOrigin.set_xticks([]) 
+      #self.axImageOrigin.set_yticks([]) 
+      self.axImageNormed.set_xticks([]) 
+      self.axImageNormed.set_yticks([]) 
+      self.colorBarNormed = None
+      self.axImageOrigin.imshow(self.imgSrc, cmap = cm.Greys_r)
+
+   def updateNormedImage(self, normType, n, k, logAlpha, beta):
+      normedImg = self.imgNormalizer.localNorm(normType, n, k, 10**logAlpha, beta)
+      if normedImg.shape[2] == 1:
+         normedImg = np.reshape(normedImg, normedImg.shape[0:2])
+
+      axesImg = self.axImageNormed.imshow(normedImg, cmap = cm.Greys_r)
+      self.axColorBar.cla()
+      self.colorBarNormed = plt.colorbar(axesImg, cax=self.axColorBar)
+
+class NomalizationVisualizer:
+
+   def __init__(self, normType, n, k, logAlpha, beta, imgFiles):
+      
       plt.ion()
       self.figImage = plt.figure()
-      self.axImageOrigin = self.figImage.add_subplot(121)
-      self.axImageNormed = self.figImage.add_subplot(122)
-      self.figImage.subplots_adjust(bottom = 0.3)
+
+      # add files
+      self.plots = []
+      numFiles = len(imgFiles)
+      cntRows = int(round(math.sqrt(0.75*numFiles), 0))
+      cntCols = int(math.ceil(float(numFiles) / cntRows))
+      for i in xrange(0, numFiles):
+         self.plots.append(NormDisplayAxes(self.figImage, imgFiles[i], [cntCols, cntRows], \
+            [i % cntCols, cntRows - (i / cntCols + 1)], [0.95/cntCols, 0.7/cntRows], normType, n, k, logAlpha, beta))
+      
+
+      #self.figImage.subplots_adjust(bottom = 0.3)
+      
       self.axNormType = self.figImage.add_subplot(9, 2, 13, axisbg='lightgoldenrodyellow', adjustable='datalim')
       self.axNormType.set_position([0.1, 0.05, 0.4, 0.2])
       self.axN = self.figImage.add_subplot(9, 2, 12, axisbg='lightgoldenrodyellow', adjustable='datalim')
@@ -120,14 +167,14 @@ class NomalizationVisualizer:
       self.axBeta.set_position([0.6, 0.05, 0.3, 0.03])
 
       self.currentNormType = normType
-      self.axImageOrigin.set_title('Original image')
       self.sliderN = widgets.Slider(self.axN, label='N', valmin=1, valmax=10, valinit=n, valfmt='%d')
       self.sliderK = widgets.Slider(self.axK, label='k', valmin=.1, valmax=10, valinit=k)
-      self.sliderAlpha = widgets.Slider(self.axAlpha, label='alpha', valmin=0, valmax=3, valinit=alpha)
-      self.sliderBeta  = widgets.Slider(self.axBeta, label='beta', valmin=0.1, valmax=3, valinit=beta)
+      self.sliderAlpha = widgets.Slider(self.axAlpha, label=r'$\log_{10}\alpha$', valmin=-6, valmax=1, valinit=logAlpha)
+      self.sliderBeta  = widgets.Slider(self.axBeta, label=r'$\beta$', valmin=0.1, valmax=3, valinit=beta)
       self.radioNormType = widgets.RadioButtons(self.axNormType, \
                      labels = ['ResponseNorm - Across maps', 'ResponseNorm - Same map', \
                                'ContrastNorm - Across maps', 'ContrastNorm - Same map'], active = self.currentNormType)
+      self.figTitle = self.figImage.suptitle("Normalization", fontsize=14)
 
       def radio_onClicked(msg):
          self.currentNormType = [m.get_text() for m in self.radioNormType.labels].index(msg)
@@ -143,29 +190,23 @@ class NomalizationVisualizer:
       self.radioNormType.on_clicked(radio_onClicked)
       
       self.updateNormedImage()
-      self.axImageOrigin.imshow(self.imgSrc, cmap = cm.Greys_r)
       plt.show()
       raw_input()
 
    def updateNormedImage(self):
-      (n, k, alpha, beta) = (int(self.sliderN.val), self.sliderK.val, self.sliderAlpha.val, self.sliderBeta.val)
-      normedImg = self.imgNormalizer.localNorm(self.currentNormType, n, k, alpha, beta)
+      (n, k, logAlpha, beta) = (int(self.sliderN.val), self.sliderK.val, self.sliderAlpha.val, self.sliderBeta.val)
+      for p in self.plots:
+         p.updateNormedImage(self.currentNormType, n, k, logAlpha, beta)
 
-      if normedImg.shape[2] == 1:
-         normedImg = np.reshape(normedImg, normedImg.shape[0:2])
-      self.axImageNormed.imshow(normedImg, cmap = cm.Greys_r)
       sTitle = ('%s\n' % self.radioNormType.labels[self.currentNormType].get_text()) + \
-               (r'$N=%d, k=%0.2f, \alpha=%0.2f, \beta=%0.2f$' % (n, k, alpha, beta))
-      self.axImageNormed.set_title(sTitle)
+               (r'$N=%d,\;k=%0.2f,\;\log_{10}\alpha=%0.2f,\;\beta=%0.2f$' % (n, k, logAlpha, beta))
+      self.figTitle.set_text(sTitle)
       self.figImage.canvas.draw()
 
-def displayNorm(imgFile, normType, n, k, alpha, beta):
-   visualizer = NomalizationVisualizer(imgFile, normType, n, k, alpha, beta)
+def displayNorm(normType, n, k, alpha, beta, imgFiles):
+   visualizer = NomalizationVisualizer(normType, n, k, alpha, beta, imgFiles)
    
 if __name__ == "__main__":
    normType = 1
-   (n, k, alpha, beta) = (5, 1, 0, 1)
-   
-   if len(sys.argv) >= 6:
-      (n, k, alpha, beta) = (int(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4]), float(sys.argv[5]))
-   displayNorm(sys.argv[1], normType, n, k, alpha, beta)
+   (n, k, logAlpha, beta) = (5, 1, -4, 1)
+   displayNorm(normType, n, k, logAlpha, beta, sys.argv[1:])
