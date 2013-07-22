@@ -64,7 +64,8 @@ def parse(fileName, outputFileName):
     np.savez(outputFileName, state=state, output=output)
     for i in xrange(0, nFilters):
         plt.imshow(output[:, :, i], cmap=cm.Greys_r)
-        plt.show(block=False)
+        #plt.show(block=False)
+        plt.show()
         raw_input()
     
 
