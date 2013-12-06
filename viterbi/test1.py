@@ -1,6 +1,7 @@
 import viterbi
 import numpy as np
 
+# this test is partly taken from cuHMM (https://code.google.com/p/chmm/)
 pi = np.array([[0.04, 0.02, 0.06, 0.04, 0.11, 0.11, 0.01, 0.09, 0.03, 0.05, 0.06, 0.11, 0.05, 0.11, 0.03, 0.08]]).T
 trans = np.array([ \
     [0.08, 0.02, 0.10, 0.05, 0.07, 0.08, 0.07, 0.04, 0.08, 0.10, 0.07, 0.02, 0.01, 0.10, 0.09, 0.01], \
