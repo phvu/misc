@@ -155,7 +155,11 @@ def checkValidMap(m):
             print 'Found duplicates (%d entries):' % dc, m[k]
         totalDupCnt += dc
     print 'Total number of duplicates:', totalDupCnt
-    
+
+def printDict(d, sFile):
+    with open(sFile, 'w') as f:
+        f.write('\n'.join([('%d %s' % (k, ' '.join([str(x) for x in set(d[k])]))) for k in d if len(d[k]) > 0]))
+        
 if __name__ == '__main__':
     import sys
     sFile = 'tree_text'
@@ -164,3 +168,5 @@ if __name__ == '__main__':
     cd = parseContextDependency(sFile)
     m = pdfIdToPhoneMap(cd)
     checkValidMap(m)
+    if len(sys.argv) > 2:
+        printDict(m, sys.argv[2])
