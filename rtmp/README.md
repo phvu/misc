@@ -18,7 +18,9 @@ to delay the signal by 2.5 seconds.
 
 ## Prerequisites
 
-It is required that [rtmpdump](http://rtmpdump.mplayerhq.hu/) and [VLC](http://www.videolan.org/vlc/index.html) are installed. The script works as long as you can launch the following command in a terminal (and hear something):
+It is required that [rtmpdump](http://rtmpdump.mplayerhq.hu/) and [VLC](http://www.videolan.org/vlc/index.html) are installed (`sudo apt-get install rtmpdump vlc`).
+
+The script works as long as you can launch the following command in a terminal (and hear something):
 
 ```sh
 $ rtmpdump -r rtmp://210.245.60.242:1935/vov3 --playpath=vov3 | vlc -vvv -
