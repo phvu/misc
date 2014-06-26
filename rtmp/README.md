@@ -1,14 +1,14 @@
 RTMP player with delay
 ===
 
-# Overview
+## Overview
 
 You might be watching World Cup 2014 via sopcast, and listening to the commentators on [VOV3](http://vov3.vov.vn)?
 You noticed that the voice (VOV3) always comes before the sopcast signal by several minutes?
 Then this script is created for you.
 It can playback the VOV3 radio stream with some delay in time, so that it is in sync with whatever you like.
 
-# Usage
+## Usage
 
 In a terminal, run
 ```sh
@@ -16,7 +16,7 @@ $ python rtmpDelay.py 2.5
 ```
 to delay the signal by 2.5 seconds.
 
-# Prerequisites
+## Prerequisites
 
 It is required that [rtmpdump](http://rtmpdump.mplayerhq.hu/) and [VLC](http://www.videolan.org/vlc/index.html) are installed. The script works as long as you can launch the following command in a terminal (and hear something):
 
