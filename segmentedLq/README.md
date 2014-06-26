@@ -16,4 +16,6 @@ Usage:
 * For `segmentedLsq`, check `test.py` for some sample code.
 * For `segmentSpec`:
 
->       $ python segmentSpec.py data/SI648.png
+```bash
+$ python segmentSpec.py data/SI648.png
+```
