@@ -16,12 +16,12 @@ $ python rtmpDelay.py 39.5
 ```
 to delay the signal by 39.5 seconds.
 
-You might also want to run
+You might also want to run:
 ```sh
 $ python rtmpDelayThreads.py 39.5
 ```
 for the same purpose. `rtmpDelayThreads.py` does exactly the same thing as `rtmpDelay.py`,
-however it is implemented as a multithreaded program, which might be more efficiently.
+except that it is implemented as a multithreaded program, which might be more efficient.
  
 ## Prerequisites
 
