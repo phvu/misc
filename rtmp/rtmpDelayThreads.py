@@ -70,16 +70,14 @@ def run(delay):
         print 'Opening stream'
         sys.stdout.flush()
         
-        dataQueue = Queue.Queue(1000)
+        dataQueue = Queue.Queue(10000)
         queueLock = threading.Lock()
         dumperThread = DumperThread(0, 'dumper', dataQueue, queueLock)
         dumperThread.start()
 
-        iStart = time.time()
         print 'Sleeping for %f secs... ' % delay,
         sys.stdout.flush()
-        while time.time() - iStart < delay:
-            time.sleep(0.5)
+        time.sleep(delay)
         print 'Here we go!'
         sys.stdout.flush()
         
