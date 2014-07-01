@@ -45,20 +45,21 @@ def run(delay):
         pDumper = subprocess.Popen([RTMP_PATH, '-r', RTMP_URL, '--playpath=' + RTMP_PLAYPATH], \
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        sData = readHeader(pDumper.stdout)
-        
+        allData = []
+        allData.append(readHeader(pDumper.stdout))
+        iStart = time.time()
         print 'Sleeping for %f secs... ' % delay,
         sys.stdout.flush()
-        time.sleep(delay)
+        while time.time() - iStart < delay:
+            allData.append(readPackage(pDumper.stdout))
         print 'Here we go!'
         sys.stdout.flush()
         
-        pPlayback = subprocess.Popen(['cvlc', '-'], stdin=subprocess.PIPE)
-        pPlayback.stdin.write(sData)
-        
+        pPlayback = subprocess.Popen(['vlc', '-'], stdin=subprocess.PIPE)
         while 1:
-            sData = readPackage(pDumper.stdout)
-            pPlayback.stdin.write(sData)
+            pPlayback.stdin.write(allData[0])
+            allData = allData[1:]
+            allData.append(readPackage(pDumper.stdout))
             
     except Exception as e:
         print "Unexpected error:", e
