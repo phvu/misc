@@ -70,7 +70,7 @@ def run(delay):
         print 'Opening stream'
         sys.stdout.flush()
         
-        dataQueue = Queue.Queue(10000)
+        dataQueue = Queue.Queue()
         queueLock = threading.Lock()
         dumperThread = DumperThread(0, 'dumper', dataQueue, queueLock)
         dumperThread.start()
