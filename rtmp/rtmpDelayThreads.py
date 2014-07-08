@@ -35,7 +35,7 @@ class DumperThread (threading.Thread):
 def run(delay):
     try:
         global exitFlag
-        print 'Opening stream'
+        print 'Opening stream...'
         sys.stdout.flush()
         
         dataQueue = Queue.Queue()
@@ -43,6 +43,9 @@ def run(delay):
         dumperThread = DumperThread(0, 'dumper', dataQueue, queueLock)
         dumperThread.start()
 
+        while dataQueue.empty():
+            time.sleep(0)
+            
         print 'Sleeping for %f secs... ' % delay,
         sys.stdout.flush()
         
