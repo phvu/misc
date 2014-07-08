@@ -1,4 +1,4 @@
-import subprocess, time, sys
+import subprocess, time, sys, datetime
 
 def readUIntBE(s):
     l = len(s)
@@ -15,22 +15,29 @@ def readUInt32BE(s):
 def readUInt24BE(s):
     assert len(s) == 3
     return readUIntBE(s)
+
+def securedRead(stream, n):
+    s = ''
+    while len(s) < n:
+        s += stream.read(n - len(s))
+    assert len(s) == n
+    return s
     
 def readHeader(stream):
-    data = stream.read(9)
+    data = securedRead(stream, 9)
     assert data[:3] == 'FLV'
     assert ord(data[3]) == 0x01
     assert ord(data[4]) == 0x04      # audio
     l = readUInt32BE(data[5:])
     assert l >= 9
     if l > 9:
-        data += stream.read(9 - l)
+        data += securedRead(stream, 9 - l)
     return data
 
 def readPackage(stream):
-    data = stream.read(15)
+    data = securedRead(stream, 15)
     l = readUInt24BE(data[5:8])
-    data += stream.read(l)
+    data += securedRead(stream, l)
     return data
     
 def run(delay):
@@ -47,11 +54,17 @@ def run(delay):
         
         allData = []
         allData.append(readHeader(pDumper.stdout))
-        iStart = time.time()
+        
         print 'Sleeping for %f secs... ' % delay,
         sys.stdout.flush()
-        while time.time() - iStart < delay:
+        
+        #iStart = time.time()
+        #while time.time() - iStart < delay:
+        #    allData.append(readPackage(pDumper.stdout))
+        iStart = datetime.datetime.now()
+        while (datetime.datetime.now() - iStart).total_seconds() < delay:
             allData.append(readPackage(pDumper.stdout))
+            
         print 'Here we go!'
         sys.stdout.flush()
         
@@ -61,8 +74,8 @@ def run(delay):
             allData = allData[1:]
             allData.append(readPackage(pDumper.stdout))
             
-    except Exception as e:
-        print "Unexpected error:", e
+    except:
+        print "Unexpected error:", sys.exc_info()
         sys.stdout.flush()
         pDumper.kill()
         pPlayback.kill()
