@@ -7,7 +7,7 @@ def test1():
     a = ql.rotate(q, v)
     m = ql.quat2RotMatrix(q)
     b = m.dot(v)
-    assert np.all(a - b <= 1E-10)
+    assert np.all(np.abs(a - b) <= 1E-10)
 
 
 if __name__ == '__main__':
