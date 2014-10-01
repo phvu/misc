@@ -51,6 +51,7 @@ def quat2RotMatrix(q):
     m = np.asarray([[w*w + x*x - y*y - z*z, 2*(x*y - w*z), 2*(x*z + w*y)], 
                     [2*(x*y + w*z), w*w - x*x + y*y - z*z, 2*(y*z - w*x)],
                     [2*(x*z - w*y), 2*(y*z + w*x), w*w - x*x - y*y + z*z]])
+
     return m
 
 ###############################################################################
@@ -87,6 +88,8 @@ def rotate(q, x):
 
 ###############################################################################
 
+'''
+
 def objectiveFunc(xVal, v, b):
     w, x, y, z = xVal
     return np.asarray([x*z + w*y - v[0]/(2.*b), \
@@ -101,16 +104,32 @@ def jacobianFunc(xVal, v, b):
                     [2*w, -2*x, -2*y, 2*z], \
                     [2*w, 2*x, 2*y, 2*z]])
 
-def estimate(v, r0 = np.asarray([0, 0.57, 0.57, 0.57])):
-    '''Estimate the rotation quaternion needed in order to rotate a gravity vector
+def estimate_old(v, r0 = np.asarray([ 0.70710678, 0.40824829, 0.40824829, 0.40824829])):
+    ''Estimate the rotation quaternion needed in order to rotate a gravity vector
     obtained from phone's accelerometer to make it aligned to the canonical 
     gravity vector of (0, 0, 9.81)
     :param v: the gravity vector obtained from phone,
     should be acceleration_with_gravity - acceleration_without_gravity
-    '''
+    ''
     assert type(v) is np.ndarray and v.shape == (3, )
     vnorm = np.linalg.norm(v)
     r = optimize.fsolve(objectiveFunc, r0, args=(v, vnorm), fprime=jacobianFunc)
     r /= np.linalg.norm(r)
     r[0] = -r[0]
     return r
+'''
+
+def estimate(v1, v2):
+    '''Estimate the rotation quaternion needed in order to rotate vector v1 into v2.
+    It is assumed that v1 and v2 has the same length (i.e. their Euclidean norms are equal),
+    otherwise the rotation quaternion can not be determined correctly.
+    '''
+    assert type(v1) is np.ndarray and v1.shape == (3, )
+    assert type(v2) is np.ndarray and v2.shape == (3, )
+    assert round(norm(v1), 5) == round(norm(v2), 5), 'v1 and v2 must have the same length'
+
+    n = np.cross(v1, v2)
+    n /= norm(n)
+    xHalf = np.arccos(v1.dot(v2)/(norm(v1)*norm(v2)))*0.5
+    sinxHalf = np.sin(xHalf)
+    return np.asarray([np.cos(xHalf), sinxHalf*n[0], sinxHalf*n[1], sinxHalf*n[2]])
