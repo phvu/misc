@@ -20,6 +20,27 @@ class EditDistance(object):
         assert n > 0 and m > 0
         
         distance = np.zeros((n+1, m+1))
+        
+        for i in xrange(1, n+1):
+            distance[i, 0] = distance[i-1, 0] + self.costInsert(target[i-1])
+        for j in xrange(1, m+1):
+            distance[0, j] = distance[0, j-1] + self.costDelete(source[j-1])
+            
+        for i in xrange(1, n+1):
+            for j in xrange(1, m+1):
+                d = [distance[i-1, j] + self.costInsert(target[i-1]), \
+                    distance[i-1, j-1] + self.costSubstitution(source[j-1], target[i-1]), \
+                    distance[i, j-1] + self.costDelete(source[j-1])]
+                distance[i, j] = min(d)
+             
+        return distance[n, m]
+
+    def minEditDistanceDebug(self, target, source):
+        n = len(target)
+        m = len(source)
+        assert n > 0 and m > 0
+        
+        distance = np.zeros((n+1, m+1))
         backPt = np.zeros((n+1, m+1), dtype=int)
         opCount = np.zeros((n+1, m+1), dtype=int)
         backPt[0, 1:] = 3
@@ -75,6 +96,6 @@ class EditDistance(object):
 if __name__ == '__main__':
     import sys
     E = EditDistance()
-    (c, d, s) = E.minEditDistance(sys.argv[1], sys.argv[2])
+    (c, d, s) = E.minEditDistanceDebug(sys.argv[1], sys.argv[2])
     print 'Distance=%f,' % d, 'I=%d, S=%d, D=%d' % tuple(c)
     print 'Aligned sequences:', s
