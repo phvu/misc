@@ -217,7 +217,8 @@ def solve(toy_file, num_toys, num_elves, out_file):
         del elves_init
 
         elves_group_file = elves_init_file
-        for (arrival_minute, toys) in toy_groups:
+        for grp_idx, (arrival_minute, toys) in enumerate(toy_groups):
+            print 'Working on group %d/%d' % (grp_idx, len(toy_groups))
 
             # find the "best" way to assign this group (toys)
             elves_group_best_file = None
