@@ -81,4 +81,3 @@ plot_func(xx, np.zeros_like(xx), gp.kernel.compute(xx, xx) + gp.noise_variance *
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 
 plt.show()
-raw_input()
