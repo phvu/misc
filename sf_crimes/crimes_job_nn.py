@@ -203,7 +203,8 @@ def random_search():
     np.random.seed(42)
 
     random_searcher = RandomizedSearchCV(model, param_distributions=param_dist, scoring=None,
-                                         n_iter=n_iter_search, random_state=42, error_score=100, verbose=5)
+                                         n_iter=n_iter_search, random_state=42, error_score=100,
+                                         verbose=5, cv=1)
 
     start = time()
     random_searcher.fit(crimes['features_train'], labels_train.ravel())
