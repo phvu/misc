@@ -5,6 +5,11 @@ import numpy as np
 from sklearn.metrics import log_loss
 import pandas as pd
 from sknn import mlp
+from keras.layers.advanced_activations import PReLU
+from keras.layers.core import Dense, Dropout, Activation
+from keras.layers.normalization import BatchNormalization
+from keras.models import Sequential
+from keras.utils import np_utils
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
@@ -62,31 +67,57 @@ def main(job_id, params):
 
     print 'Done process labels'
 
-    layers = [mlp.Layer('Rectifier', name='input', units=features_train.shape[1], dropout=params['input_dropout'])]
+    if False:
 
-    for i in range(0, params['layers']):
-        layers.append(mlp.Layer('Rectifier', name='hidden_{}'.format(i),
-                                units=int(params['hidden_units']),
-                                dropout=params['hidden_dropout']))
-    layers.append(mlp.Layer('Softmax', dropout=0, units=len(all_labels)))
+        layers = [mlp.Layer('Rectifier', name='input', units=features_train.shape[1], dropout=params['input_dropout'])]
 
-    model = mlp.Classifier(layers=layers,
-                           learning_rate=params['learning_rate'],
-                           n_iter=20 * (features_train.shape[0] / batch_size),
-                           random_state=42,
-                           learning_rule='adagrad',
-                           batch_size=batch_size,
-                           weight_decay=params['weight_decay'],
-                           valid_set=(crimes['features_val'], labels_vals))
+        for i in range(0, params['layers']):
+            layers.append(mlp.Layer('Rectifier', name='hidden_{}'.format(i),
+                                    units=int(params['hidden_units']),
+                                    dropout=params['hidden_dropout']))
+        layers.append(mlp.Layer('Softmax', dropout=0, units=len(all_labels)))
 
-    print 'Start fitting'
-    try:
-        model.fit(features_train, labels_train)
-    except RuntimeError as e:
-        if 'diverged' in e.message:
-            # super bad
-            return 100
-        raise
+        model = mlp.Classifier(layers=layers,
+                               learning_rate=params['learning_rate'],
+                               n_iter=20 * (features_train.shape[0] / batch_size),
+                               random_state=42,
+                               learning_rule='adagrad',
+                               batch_size=batch_size,
+                               weight_decay=params['weight_decay'],
+                               valid_set=(crimes['features_val'], labels_vals))
+
+        print 'Start fitting'
+        try:
+            model.fit(features_train, labels_train)
+        except RuntimeError as e:
+            if 'diverged' in e.message:
+                # super bad
+                return 100
+            raise
+    else:
+
+        labels_train = np_utils.to_categorical(labels_train)
+        labels_vals = np_utils.to_categorical(labels_vals)
+        labels_full = np_utils.to_categorical(labels_full)
+
+        model = Sequential()
+        model.add(Dense(input_dim=features_train.shape[1], output_dim=int(params['hidden_units']),
+                        init='glorot_uniform'))
+        model.add(PReLU(input_shape=(int(params['hidden_units']),)))
+        model.add(Dropout(params['input_dropout']))
+
+        for i in range(params['layers']):
+            model.add(Dense(input_dim=params['hidden_units'], output_dim=params['hidden_units'], init='glorot_uniform'))
+            model.add(PReLU(input_shape=(params['hidden_units'],)))
+            model.add(BatchNormalization(input_shape=(params['hidden_units'],)))
+            model.add(Dropout(params['hidden_dropout']))
+
+        model.add(Dense(input_dim=params['hidden_units'], output_dim=len(all_labels), init='glorot_uniform'))
+        model.add(Activation('softmax'))
+        model.compile(loss='categorical_crossentropy', optimizer='adam')
+
+        model.fit(features_train, labels_train, nb_epoch=20, batch_size=batch_size,
+                  verbose=5, validation_data=(crimes['features_val'], labels_vals))
 
     loss_train = log_loss(labels_train, model.predict_proba(crimes['features_train']))
     loss_val = log_loss(labels_vals, model.predict_proba(crimes['features_val']))
