@@ -157,12 +157,6 @@ class NeuralNetworkClassifier(BaseEstimator, ClassifierMixin):
             setattr(self, parameter, value)
         return self
 
-    def score(self, X, y, sample_weight=None):
-        try:
-            return log_loss(y, self.predict_proba(X), sample_weight=sample_weight)
-        except IndexError:
-            return 100
-
 
 def report(grid_scores, n_top=10):
     from operator import itemgetter
