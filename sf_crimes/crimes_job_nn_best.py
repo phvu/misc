@@ -128,8 +128,7 @@ def main(job_id, params):
     print 'loss_val: ', loss_val
     sys.stdout.flush()
 
-    pred_df = pd.DataFrame(model.predict_proba(crimes['features_test']),
-                           columns=sorted(crimes['labels'].unique()))
+    pred_df = pd.DataFrame(model.predict_proba(crimes['features_test']), columns=all_labels)
     pred_df.to_csv(os.path.join(os.path.abspath(os.path.dirname(__file__)), './crimeSF_NN_logodds.csv'),
                    index_label="Id", na_rep="0")
 
