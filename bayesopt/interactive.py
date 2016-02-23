@@ -1,23 +1,33 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from gaussian_process import GaussianProcess
+from scipy.stats import norm as stats_norm
+
+from gaussian_process import GaussianProcess, SquaredDistanceKernel
+
+
+BOUNDS = [0, 10, -10, 10]
+PLOT_POINT_COUNT = 1000
 
 
 def func(v):
-    return np.sin(v)
+    return v * np.sin(v)
 
 
-gp = GaussianProcess(noise_variance=1E-5)
+gp = GaussianProcess(kernel=SquaredDistanceKernel(kernel_param=0.01), noise_variance=1E-3)
 
 fig = plt.figure()
-ax_data = fig.add_subplot(211)
-ax_func = fig.add_subplot(212)
+ax_data = fig.add_subplot(311)
+ax_acquisition = fig.add_subplot(312)
+ax_func = fig.add_subplot(313)
+
 
 l_mu = None
 l_data = None
 l_stddev = None
+l_acquisition = None
+l_acquisition_area = None
 l_func = None
-xx = np.linspace(-5, 5, 100).reshape(-1, 1)
+xx = np.linspace(BOUNDS[0], BOUNDS[1], PLOT_POINT_COUNT).reshape(-1, 1)
 
 
 def plot_func(data, mu, cov):
@@ -28,15 +38,17 @@ def plot_func(data, mu, cov):
     if l_func is not None:
         [a.remove() for a in l_func]
     l_func = ax_func.plot(data, f_post)
-    ax_func.axis([-5, 5, -3.5, 3.5])
+    ax_func.axis(BOUNDS)
 
 
 def onclick(event):
     global l_mu
     global l_data
     global l_stddev
+    global l_acquisition
+    global l_acquisition_area
 
-    if event.inaxes != ax_data:
+    if event.inaxes != ax_data or event.button != 1:
         return
 
     # update the GP with the new data
@@ -61,20 +73,35 @@ def onclick(event):
         l_stddev.remove()
     l_stddev = ax_data.fill_between(xx.flat, mu[:, 0] - 3*s, mu[:, 0] + 3*s, color="#dddddd")
 
-    ax_data.axis([-5, 5, -3.5, 3.5])
-
     # draw the functions
     plot_func(xx, mu, cov)
 
+    # probability of improvement (acquisition function)
+    eps = 1E-4
+    pi = stats_norm.cdf(np.divide(mu - gp.max_observed_value - eps, s[:, None]))
+
+    if l_acquisition is not None:
+        l_acquisition.set_data(xx, pi)
+    else:
+        l_acquisition = ax_acquisition.plot(xx, pi, 'g-', lw=2)[0]
+
+    if l_acquisition_area is not None:
+        l_acquisition_area.remove()
+    l_acquisition_area = ax_acquisition.fill_between(xx.flat, -1, pi.flat, color="#ccffcc")
+
+    ax_acquisition.axis([BOUNDS[0], BOUNDS[1], -0.5, 1])
+
     fig.canvas.draw()
 
-x = np.linspace(-5, 5, 100).reshape(-1, 1)
+x = np.linspace(BOUNDS[0], BOUNDS[1], PLOT_POINT_COUNT).reshape(-1, 1)
 y = func(x)
 
 ax_data.plot(x, y, 'b-')
 l_mu = ax_data.plot(xx, np.zeros((xx.shape[0], 1)), 'r--', lw=2)[0]
 l_stddev = ax_data.fill_between(xx.flat, -3, 3, color='#dddddd')
-ax_data.axis([-5, 5, -3.5, 3.5])
+ax_data.axis(BOUNDS)
+
+ax_acquisition.axis([BOUNDS[0], BOUNDS[1], -0.5, 1])
 
 plot_func(xx, np.zeros_like(xx), gp.kernel.compute(xx, xx) + gp.noise_variance * np.eye(xx.shape[0]))
 

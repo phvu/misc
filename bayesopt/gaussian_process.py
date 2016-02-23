@@ -17,11 +17,21 @@ class SquaredDistanceKernel(Kernel):
         return np.exp(-.5 * (1/self.kernel_parameter) * sq_dist)
 
 
+class Matern52Kernel(Kernel):
+    def __init__(self, kernel_param=0.1):
+        self.kernel_parameter = kernel_param
+
+    def compute(self, a, b):
+        sq_dist = np.sum(a ** 2, 1).reshape(-1, 1) + np.sum(b ** 2, 1) - 2 * np.dot(a, b.T)
+        sq_dist *= 5
+        return (1 + np.sqrt(sq_dist) + sq_dist/3) * np.exp(-np.sqrt(sq_dist))
+
+
 class GaussianProcess(object):
     """
     Implements a GP with mean zero and a custom kernel
     """
-    def __init__(self, kernel=SquaredDistanceKernel(), noise_variance=0.00005, x=None, y=None):
+    def __init__(self, kernel=Matern52Kernel(), noise_variance=0.00005, x=None, y=None):
         """
         Initialize the GP with the given kernel and a noise parameter for the variance
         Optionally initialize this GP with given X and Y
@@ -37,6 +47,7 @@ class GaussianProcess(object):
         self.kernel = kernel
         self.noise_variance = noise_variance
         self.cov = None if self.X is None else kernel.compute(self.X, self.X)
+        self.max_observed_value = -99999
 
     def predict(self, x, y=None):
         """
@@ -64,6 +75,7 @@ class GaussianProcess(object):
                 self.X = x
                 self.Y = y
                 self.cov = k_2star
+                self.max_observed_value = max(self.max_observed_value, self.Y.max())
         else:
             l = np.linalg.cholesky(self.cov + self.noise_variance * np.eye(self.cov.shape[0]))
             k_star = self.kernel.compute(self.X, x)
@@ -73,9 +85,10 @@ class GaussianProcess(object):
             cov_posterior = k_2star + self.noise_variance * np.eye(k_2star.shape[0]) - np.dot(l_div_k_star.T,
                                                                                               l_div_k_star)
             if y is not None:
-                    self.X = np.vstack((self.X, x))
-                    self.Y = np.vstack((self.Y, y))
-                    self.cov = np.hstack((self.cov, k_star))
-                    self.cov = np.vstack((self.cov, np.hstack((k_star.T, k_2star))))
+                self.X = np.vstack((self.X, x))
+                self.Y = np.vstack((self.Y, y))
+                self.cov = np.hstack((self.cov, k_star))
+                self.cov = np.vstack((self.cov, np.hstack((k_star.T, k_2star))))
+                self.max_observed_value = max(self.max_observed_value, self.Y.max())
 
         return mu, cov_posterior, np.sqrt(np.diag(cov_posterior))
