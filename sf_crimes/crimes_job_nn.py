@@ -135,9 +135,10 @@ class NeuralNetworkClassifier(BaseEstimator, ClassifierMixin):
         model.compile(loss='categorical_crossentropy', optimizer='adam')
 
         y_cat = np_utils.to_categorical(y, nb_classes=self.n_classes)
+        val_data = (self.valid_set[0], np_utils.to_categorical(self.valid_set[1], self.n_classes))
 
         model.fit(X, y_cat, nb_epoch=20, batch_size=self.batch_size,
-                  verbose=5, validation_data=self.valid_set)
+                  verbose=5, validation_data=val_data)
         self._model = model
 
     def predict(self, X):
@@ -156,6 +157,12 @@ class NeuralNetworkClassifier(BaseEstimator, ClassifierMixin):
         for parameter, value in parameters.items():
             setattr(self, parameter, value)
         return self
+
+    def score(self, X, y, sample_weight=None):
+        if X.size == 0:
+            # use the validation set
+            return log_loss(self.valid_set[1], self.predict_proba(self.valid_set[0]), sample_weight=sample_weight)
+        return log_loss(y, self.predict_proba(X), sample_weight=sample_weight)
 
 
 def report(grid_scores, n_top=10):
@@ -195,7 +202,7 @@ def random_search():
                   }
 
     model = NeuralNetworkClassifier(n_classes=len(all_labels), batch_size=batch_size,
-                                    valid_set=(crimes['features_val'], np_utils.to_categorical(labels_vals)))
+                                    valid_set=(crimes['features_val'], labels_vals))
 
     n_iter_search = 40
     np.random.seed(42)
