@@ -56,6 +56,7 @@ def main(job_id, params):
     crimes = np.load(DATA_FILE)
     features_train = crimes['features_train']
     all_labels = sorted(list(set(np.unique(crimes['labels_train'])) | set(np.unique(crimes['labels_val']))))
+    hidden_units = int(params['hidden_units'])
     batch_size = 64
 
     labels_train = create_labels(crimes['labels_train'], all_labels)
@@ -67,18 +68,17 @@ def main(job_id, params):
     labels_full = np_utils.to_categorical(labels_full)
 
     model = Sequential()
-    model.add(Dense(input_dim=features_train.shape[1], output_dim=int(params['hidden_units']),
-                    init='glorot_uniform'))
-    model.add(PReLU(input_shape=(int(params['hidden_units']),)))
+    model.add(Dense(input_dim=features_train.shape[1], output_dim=hidden_units, init='glorot_uniform'))
+    model.add(PReLU(input_shape=(hidden_units,)))
     model.add(Dropout(params['input_dropout']))
 
     for i in range(params['layers']):
-        model.add(Dense(input_dim=params['hidden_units'], output_dim=params['hidden_units'], init='glorot_uniform'))
-        model.add(PReLU(input_shape=(params['hidden_units'],)))
-        model.add(BatchNormalization(input_shape=(params['hidden_units'],)))
+        model.add(Dense(input_dim=hidden_units, output_dim=hidden_units, init='glorot_uniform'))
+        model.add(PReLU(input_shape=(hidden_units,)))
+        model.add(BatchNormalization(input_shape=(hidden_units,)))
         model.add(Dropout(params['hidden_dropout']))
 
-    model.add(Dense(input_dim=params['hidden_units'], output_dim=len(all_labels), init='glorot_uniform'))
+    model.add(Dense(input_dim=hidden_units, output_dim=len(all_labels), init='glorot_uniform'))
     model.add(Activation('softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
 
