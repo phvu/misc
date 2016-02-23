@@ -178,6 +178,7 @@ def random_search():
     from time import time
     from scipy.stats import uniform as sp_uniform, randint as sp_randint
     from sklearn.grid_search import RandomizedSearchCV
+    from sklearn.cross_validation import ShuffleSplit
 
     crimes = np.load(DATA_FILE)
     # features_train = crimes['features_train']
@@ -205,7 +206,7 @@ def random_search():
     random_searcher = RandomizedSearchCV(model, param_distributions=param_dist, scoring=None,
                                          n_iter=n_iter_search, random_state=42, error_score=100,
                                          verbose=5,
-                                         cv=[(crimes['features_val'], np_utils.to_categorical(labels_vals))])
+                                         cv=ShuffleSplit(n=crimes['features_train'].shape[0], n_iter=1))
 
     start = time()
     random_searcher.fit(crimes['features_train'], labels_train.ravel())
