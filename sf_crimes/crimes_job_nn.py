@@ -197,7 +197,7 @@ def random_search():
                   }
 
     model = NeuralNetworkClassifier(n_classes=len(all_labels), batch_size=batch_size,
-                                    valid_set=(crimes['features_val'], labels_vals))
+                                    valid_set=(crimes['features_val'], np_utils.to_categorical(labels_vals)))
 
     n_iter_search = 40
     np.random.seed(42)
