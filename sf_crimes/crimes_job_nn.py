@@ -134,7 +134,7 @@ class NeuralNetworkClassifier(BaseEstimator, ClassifierMixin):
         model.add(Activation('softmax'))
         model.compile(loss='categorical_crossentropy', optimizer='adam')
 
-        y_cat = np_utils.to_categorical(y)
+        y_cat = np_utils.to_categorical(y, nb_classes=self.n_classes)
 
         model.fit(X, y_cat, nb_epoch=20, batch_size=self.batch_size,
                   verbose=5, validation_data=self.valid_set)
@@ -206,7 +206,7 @@ def random_search():
     random_searcher = RandomizedSearchCV(model, param_distributions=param_dist, scoring=None,
                                          n_iter=n_iter_search, random_state=42, error_score=100,
                                          verbose=5,
-                                         cv=ShuffleSplit(n=crimes['features_train'].shape[0], n_iter=1))
+                                         cv=ShuffleSplit(n=crimes['features_train'].shape[0], n_iter=1, test_size=0))
 
     start = time()
     random_searcher.fit(crimes['features_train'], labels_train.ravel())
