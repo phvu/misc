@@ -4,10 +4,14 @@ import sys
 import numpy as np
 from sklearn.metrics import log_loss
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sknn import mlp
+from keras.layers.advanced_activations import PReLU
+from keras.layers.core import Dense, Dropout, Activation
+from keras.layers.normalization import BatchNormalization
+from keras.models import Sequential
+from keras.utils import np_utils
 import logging
 
-logging.basicConfig()
+logging.basicConfig(level=logging.DEBUG)
 
 DATA_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), './crimes_data.npz')
 
@@ -58,30 +62,28 @@ def main(job_id, params):
     labels_vals = create_labels(crimes['labels_val'], all_labels)
     labels_full = create_labels(crimes['labels'], all_labels)
 
-    layers = [mlp.Layer('Linear', name='input', units=features_train.shape[1], dropout=params['input_dropout'])]
+    labels_train = np_utils.to_categorical(labels_train)
+    labels_vals = np_utils.to_categorical(labels_vals)
+    labels_full = np_utils.to_categorical(labels_full)
 
-    for i in range(0, params['layers']):
-        layers.append(mlp.Layer('Rectifier', name='hidden_{}'.format(i),
-                                units=int(params['hidden_units']),
-                                dropout=params['hidden_dropout']))
-    layers.append(mlp.Layer('Softmax', dropout=0, units=len(all_labels)))
+    model = Sequential()
+    model.add(Dense(input_dim=features_train.shape[1], output_dim=int(params['hidden_units']),
+                    init='glorot_uniform'))
+    model.add(PReLU(input_shape=(int(params['hidden_units']),)))
+    model.add(Dropout(params['input_dropout']))
 
-    model = mlp.Classifier(layers=layers,
-                           learning_rate=params['learning_rate'],
-                           n_iter=20 * (features_train.shape[0] / batch_size),
-                           random_state=42,
-                           learning_rule='adagrad',
-                           batch_size=batch_size,
-                           weight_decay=params['weight_decay'],
-                           valid_set=(crimes['features_val'], labels_vals))
+    for i in range(params['layers']):
+        model.add(Dense(input_dim=params['hidden_units'], output_dim=params['hidden_units'], init='glorot_uniform'))
+        model.add(PReLU(input_shape=(params['hidden_units'],)))
+        model.add(BatchNormalization(input_shape=(params['hidden_units'],)))
+        model.add(Dropout(params['hidden_dropout']))
 
-    try:
-        model.fit(features_train, labels_train)
-    except RuntimeError as e:
-        if 'diverged' in e.message:
-            # super bad
-            return 100
-        raise
+    model.add(Dense(input_dim=params['hidden_units'], output_dim=len(all_labels), init='glorot_uniform'))
+    model.add(Activation('softmax'))
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
+
+    model.fit(features_train, labels_train, nb_epoch=20, batch_size=batch_size,
+              verbose=5, validation_data=(crimes['features_val'], labels_vals))
 
     loss_train = log_loss(labels_train, model.predict_proba(crimes['features_train']))
     loss_val = log_loss(labels_vals, model.predict_proba(crimes['features_val']))
@@ -117,22 +119,26 @@ class NeuralNetworkClassifier(BaseEstimator, ClassifierMixin):
         self.weight_decay = weight_decay
 
     def fit(self, X, y):
-        layers = [mlp.Layer('Linear', name='input', units=X.shape[1], dropout=self.input_dropout)]
+        model = Sequential()
+        model.add(Dense(input_dim=X.shape[1], output_dim=self.hidden_units, init='glorot_uniform'))
+        model.add(PReLU(input_shape=(self.hidden_units,)))
+        model.add(Dropout(self.input_dropout))
 
-        for i in range(0, self.layers):
-            layers.append(mlp.Layer('Rectifier', name='hidden_{}'.format(i),
-                                    units=int(self.hidden_units), dropout=self.hidden_dropout))
-        layers.append(mlp.Layer('Softmax', dropout=0, units=self.n_classes))
+        for i in range(self.layers):
+            model.add(Dense(input_dim=self.hidden_units, output_dim=self.hidden_units, init='glorot_uniform'))
+            model.add(PReLU(input_shape=(self.hidden_units,)))
+            model.add(BatchNormalization(input_shape=(self.hidden_units,)))
+            model.add(Dropout(self.hidden_dropout))
 
-        self._model = mlp.Classifier(layers=layers,
-                                     learning_rate=self.learning_rate,
-                                     n_iter=20 * (X.shape[0] / self.batch_size),
-                                     random_state=42,
-                                     learning_rule='adagrad',
-                                     batch_size=self.batch_size,
-                                     weight_decay=self.weight_decay,
-                                     valid_set=self.valid_set)
-        self._model.fit(X, y)
+        model.add(Dense(input_dim=self.hidden_units, output_dim=self.n_classes, init='glorot_uniform'))
+        model.add(Activation('softmax'))
+        model.compile(loss='categorical_crossentropy', optimizer='adam')
+
+        y_cat = np_utils.to_categorical(y)
+
+        model.fit(X, y_cat, nb_epoch=20, batch_size=self.batch_size,
+                  verbose=5, validation_data=self.valid_set)
+        self._model = model
 
     def predict(self, X):
         return self._model.predict(X)
@@ -155,7 +161,7 @@ class NeuralNetworkClassifier(BaseEstimator, ClassifierMixin):
         return log_loss(y, self.predict_proba(X), sample_weight=sample_weight)
 
 
-def report(grid_scores, n_top=3):
+def report(grid_scores, n_top=10):
     from operator import itemgetter
 
     top_scores = sorted(grid_scores, key=itemgetter(1), reverse=True)[:n_top]
