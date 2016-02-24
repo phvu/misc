@@ -48,11 +48,29 @@ def create_labels(labels, all_labels):
     return lb
 
 
-def main(job_id, params):
-    print job_id, params
-    params = get_params(params)
-    print job_id, params
+def create_model_and_fit(train_features, train_labels, hidden_units, output_units, n_layers,
+                         input_dropout, hidden_dropout, batch_size, features_val, labels_vals):
+    model = Sequential()
+    model.add(Dense(input_dim=train_features.shape[1], output_dim=hidden_units, init='glorot_uniform'))
+    model.add(PReLU(input_shape=(hidden_units,)))
+    model.add(Dropout(input_dropout))
 
+    for i in range(n_layers):
+        model.add(Dense(input_dim=hidden_units, output_dim=hidden_units, init='glorot_uniform'))
+        model.add(PReLU(input_shape=(hidden_units,)))
+        model.add(BatchNormalization(input_shape=(hidden_units,)))
+        model.add(Dropout(hidden_dropout))
+
+    model.add(Dense(input_dim=hidden_units, output_dim=output_units, init='glorot_uniform'))
+    model.add(Activation('softmax'))
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
+
+    model.fit(train_features, train_labels, nb_epoch=20, batch_size=batch_size,
+              verbose=5, validation_data=(features_val, labels_vals))
+    return model
+
+
+def fit_model_and_test(params):
     crimes = np.load(DATA_FILE)
     features_train = crimes['features_train']
     all_labels = sorted(list(set(np.unique(crimes['labels_train'])) | set(np.unique(crimes['labels_val']))))
@@ -67,23 +85,9 @@ def main(job_id, params):
     labels_vals = np_utils.to_categorical(labels_vals)
     labels_full = np_utils.to_categorical(labels_full)
 
-    model = Sequential()
-    model.add(Dense(input_dim=features_train.shape[1], output_dim=hidden_units, init='glorot_uniform'))
-    model.add(PReLU(input_shape=(hidden_units,)))
-    model.add(Dropout(params['input_dropout']))
-
-    for i in range(params['layers']):
-        model.add(Dense(input_dim=hidden_units, output_dim=hidden_units, init='glorot_uniform'))
-        model.add(PReLU(input_shape=(hidden_units,)))
-        model.add(BatchNormalization(input_shape=(hidden_units,)))
-        model.add(Dropout(params['hidden_dropout']))
-
-    model.add(Dense(input_dim=hidden_units, output_dim=len(all_labels), init='glorot_uniform'))
-    model.add(Activation('softmax'))
-    model.compile(loss='categorical_crossentropy', optimizer='adam')
-
-    model.fit(features_train, labels_train, nb_epoch=20, batch_size=batch_size,
-              verbose=5, validation_data=(crimes['features_val'], labels_vals))
+    model = create_model_and_fit(features_train,labels_train, hidden_units, len(all_labels),  params['layers'],
+                                 params['input_dropout'], params['hidden_dropout'],
+                                 batch_size, crimes['features_val'], labels_vals)
 
     loss_train = log_loss(labels_train, model.predict_proba(crimes['features_train']))
     loss_val = log_loss(labels_vals, model.predict_proba(crimes['features_val']))
@@ -93,7 +97,15 @@ def main(job_id, params):
     print 'loss_train: ', loss_train
     print 'loss_val: ', loss_val
     sys.stdout.flush()
+    return loss_val, model, crimes, all_labels
 
+
+def main(job_id, params):
+    print job_id, params
+    params = get_params(params)
+    print job_id, params
+
+    loss_val, model, crimes, all_labels = fit_model_and_test(params)
     return loss_val
 
 
@@ -119,27 +131,11 @@ class NeuralNetworkClassifier(BaseEstimator, ClassifierMixin):
         self.weight_decay = weight_decay
 
     def fit(self, X, y):
-        model = Sequential()
-        model.add(Dense(input_dim=X.shape[1], output_dim=self.hidden_units, init='glorot_uniform'))
-        model.add(PReLU(input_shape=(self.hidden_units,)))
-        model.add(Dropout(self.input_dropout))
-
-        for i in range(self.layers):
-            model.add(Dense(input_dim=self.hidden_units, output_dim=self.hidden_units, init='glorot_uniform'))
-            model.add(PReLU(input_shape=(self.hidden_units,)))
-            model.add(BatchNormalization(input_shape=(self.hidden_units,)))
-            model.add(Dropout(self.hidden_dropout))
-
-        model.add(Dense(input_dim=self.hidden_units, output_dim=self.n_classes, init='glorot_uniform'))
-        model.add(Activation('softmax'))
-        model.compile(loss='categorical_crossentropy', optimizer='adam')
-
-        y_cat = np_utils.to_categorical(y, nb_classes=self.n_classes)
-        val_data = (self.valid_set[0], np_utils.to_categorical(self.valid_set[1], self.n_classes))
-
-        model.fit(X, y_cat, nb_epoch=20, batch_size=self.batch_size,
-                  verbose=5, validation_data=val_data)
-        self._model = model
+        self._model = create_model_and_fit(X, np_utils.to_categorical(y, nb_classes=self.n_classes),
+                                           self.hidden_units, self.n_classes,
+                                           self.layers, self.input_dropout, self.hidden_dropout,
+                                           self.batch_size, self.valid_set[0],
+                                           np_utils.to_categorical(self.valid_set[1], self.n_classes))
 
     def predict(self, X):
         return self._model.predict(X)
