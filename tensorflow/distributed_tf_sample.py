@@ -17,21 +17,22 @@ L2_REGULARIZER = 1E-5
 
 
 class Model(object):
-    def __init__(self, variable_device, worker_device, worker_name_scope, optimizer):
+    def __init__(self, variable_device, variable_scope, worker_device, worker_name_scope, reuse, optimizer):
 
         weights = []
         biases = []
         with tf.device(variable_device):
-            for i in range(0, LAYERS + 1):
-                ws = [784 if i == 0 else HIDDEN_SIZE, 10 if i == LAYERS else HIDDEN_SIZE]
+            with tf.variable_scope(variable_scope, reuse=reuse):
+                for i in range(0, LAYERS + 1):
+                    ws = [784 if i == 0 else HIDDEN_SIZE, 10 if i == LAYERS else HIDDEN_SIZE]
 
-                # Xavier initialization
-                weights.append(tf.get_variable("weight{}".format(i), ws,
-                                               initializer=tf.truncated_normal_initializer(
-                                                   stddev=math.sqrt(3.0 / (ws[0] + ws[1])))))
-                biases.append(tf.get_variable("bias{}".format(i), ws[1:],
-                                              initializer=tf.constant_initializer(value=0, dtype=tf.float32)))
-            tf.get_variable_scope().reuse_variables()
+                    # Xavier initialization
+                    weights.append(tf.get_variable("weight{}".format(i), ws,
+                                                   initializer=tf.truncated_normal_initializer(
+                                                       stddev=math.sqrt(3.0 / (ws[0] + ws[1])))))
+                    biases.append(tf.get_variable("bias{}".format(i), ws[1:],
+                                                  initializer=tf.constant_initializer(value=0, dtype=tf.float32)))
+            # tf.get_variable_scope().reuse_variables()
 
         with tf.device(worker_device):
             with tf.name_scope(worker_name_scope):
@@ -71,7 +72,9 @@ with tf.Graph().as_default():
 
     for i, w in enumerate(WORKER_TASKS):
         models.append(Model(variable_device=PS_DEVICE,
+                            variable_scope='mnist_variables',
                             worker_device=w, worker_name_scope='worker_name_scope_{}'.format(i),
+                            reuse=i != 0,
                             optimizer=opt))
 
     # compute gradients of workers
