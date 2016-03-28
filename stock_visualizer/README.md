@@ -1,6 +1,6 @@
 # Visualizing stock data using sequence embedding
 
-## Approach:
+## Approach
 
 - Take ~1800 series on NASDAQ North US between 2008 and 2015
 - Run some "magic" feature engineering (c.f. @minhtran) to create 28 features for each symbol
@@ -24,10 +24,11 @@ After training, the feature vectors can be extracted by:
 # Results
 
 We trained a Seq2Seq model of 1024 GRU units, with learning rate of 0.1. 
-The final visualization can be seen [here]()
+The final visualization can be seen [here](http://nbviewer.jupyter.org/github/phvu/misc/blob/master/stock_visualizer/Visualize.ipynb)
  
 ## Next steps
 
-- Use a more sophisticated Seq2Seq model.
 - Use LSTM instead of GRU.
-- Use deeper network
+- Use a more sophisticated Seq2Seq model (i.e. more layers, attention models...)
+- Maybe some clever strategy in splitting the series/feature engineering
+- Fix bugs (if any)
