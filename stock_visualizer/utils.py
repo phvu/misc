@@ -98,8 +98,12 @@ def read_data(buckets, data_dir='./data', sequence_len=40):
         normalize_data(data_dir, sequence_len)
 
     def wtf(f):
-        data = np.load(f)['data']
+        loaded_data = np.load(f)
+        data = loaded_data['data']
+        labels = loaded_data['labels']
+
         data_set = [[] for _ in buckets]
+        all_labels = [[] for _ in buckets]
 
         print('Reading {}'.format(f))
 
@@ -110,8 +114,9 @@ def read_data(buckets, data_dir='./data', sequence_len=40):
                     source = data[:-1, :, d]
                     target = np.vstack((data[1:, :, d], np.zeros((1, data.shape[1]))))
                     data_set[bucket_id].append([source, target])
+                    all_labels[bucket_id].append(labels[d])
                 break
         print('Done reading {}'.format(f))
-        return data_set
+        return data_set, all_labels
 
-    return wtf(data_files[0]), wtf(data_files[1])
+    return wtf(data_files[0])[0], wtf(data_files[1])[0], wtf(os.path.join(data_dir, 'sequences_all.npz'))

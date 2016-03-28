@@ -60,8 +60,6 @@ tf.app.flags.DEFINE_integer("steps_per_checkpoint", 10,
                             "How many training steps to do per checkpoint.")
 tf.app.flags.DEFINE_boolean("decode", False,
                             "Set to True for interactive decoding.")
-tf.app.flags.DEFINE_boolean("self_test", False,
-                            "Run a self-test if this is set to True.")
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -96,7 +94,7 @@ def train():
         print("Reading development and training data (limit: %d)."
               % FLAGS.max_train_data_size)
 
-        train_set, dev_set = utils.read_data(_buckets, data_dir=FLAGS.data_dir, sequence_len=FLAGS.seq_len)
+        train_set, dev_set, _ = utils.read_data(_buckets, data_dir=FLAGS.data_dir, sequence_len=FLAGS.seq_len)
 
         train_bucket_sizes = [len(train_set[b]) for b in range(len(_buckets))]
         train_total_size = float(sum(train_bucket_sizes))
@@ -122,8 +120,8 @@ def train():
             start_time = time.time()
             encoder_inputs, decoder_inputs, target_weights = model.get_batch(
                 train_set, bucket_id)
-            _, step_loss, _ = model.step(sess, encoder_inputs, decoder_inputs,
-                                         target_weights, bucket_id, False)
+            _, step_loss, _, _ = model.step(sess, encoder_inputs, decoder_inputs,
+                                            target_weights, bucket_id, False)
             step_time += (time.time() - start_time) / FLAGS.steps_per_checkpoint
             loss += step_loss / FLAGS.steps_per_checkpoint
             current_step += 1
@@ -150,83 +148,53 @@ def train():
                         continue
                     encoder_inputs, decoder_inputs, target_weights = model.get_batch(
                         dev_set, bucket_id)
-                    _, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs,
-                                                 target_weights, bucket_id, True)
+                    _, eval_loss, _, _ = model.step(sess, encoder_inputs, decoder_inputs,
+                                                    target_weights, bucket_id, True)
                     # eval_ppx = math.exp(eval_loss) if eval_loss < 300 else float('inf')
                     print("  eval: bucket %d loss %.2f" % (bucket_id, eval_loss))
                 sys.stdout.flush()
 
 
 def decode():
-    # TODO: FIX THIS
-
+    print('Decoding')
     with tf.Session() as sess:
-        # Create model and load parameters.
-        model = create_model(sess, True)
-        model.batch_size = 1  # We decode one sentence at a time.
+        # Create model.
+        print("Creating %d layers of %d units." % (FLAGS.num_layers, FLAGS.size))
+        model = create_model(sess, False)
 
-        # Load vocabularies.
-        en_vocab_path = os.path.join(FLAGS.data_dir,
-                                     "vocab%d.en" % FLAGS.en_vocab_size)
-        fr_vocab_path = os.path.join(FLAGS.data_dir,
-                                     "vocab%d.fr" % FLAGS.fr_vocab_size)
-        en_vocab, _ = data_utils.initialize_vocabulary(en_vocab_path)
-        _, rev_fr_vocab = data_utils.initialize_vocabulary(fr_vocab_path)
+        # Read data into buckets and compute their sizes.
+        print("Reading development and training data (limit: %d)."
+              % FLAGS.max_train_data_size)
 
-        # Decode from standard input.
-        sys.stdout.write("> ")
+        _, _, all_data_labels = utils.read_data(_buckets, data_dir=FLAGS.data_dir, sequence_len=FLAGS.seq_len)
+
+        all_data, all_labels = all_data_labels
+        all_states = []
+        for bucket_id in range(len(_buckets)):
+            if len(all_data[bucket_id]) == 0:
+                print("  eval: empty bucket %d" % bucket_id)
+                continue
+            idx = 0
+            total_eval_loss = 0
+            i = 0
+            total_len = len(all_data[bucket_id])
+            while idx < total_len:
+                encoder_inputs, decoder_inputs, target_weights, idx = model.get_batch(all_data, bucket_id, idx)
+                _, eval_loss, _, states = model.step(sess, encoder_inputs, decoder_inputs, target_weights, bucket_id, True)
+                total_eval_loss += eval_loss
+                i += 1
+                all_states.append(states)
+                print('\rBucket {}, item {}/{}'.format(bucket_id, idx, total_len), end='\r')
+                sys.stdout.flush()
+
+            print("  eval: bucket %d loss %.2f" % (bucket_id, total_eval_loss / i))
         sys.stdout.flush()
-        sentence = sys.stdin.readline()
-        while sentence:
-            # Get token-ids for the input sentence.
-            token_ids = data_utils.sentence_to_token_ids(sentence, en_vocab)
-            # Which bucket does it belong to?
-            bucket_id = min([b for b in xrange(len(_buckets))
-                             if _buckets[b][0] > len(token_ids)])
-            # Get a 1-element batch to feed the sentence to the model.
-            encoder_inputs, decoder_inputs, target_weights = model.get_batch(
-                {bucket_id: [(token_ids, [])]}, bucket_id)
-            # Get output logits for the sentence.
-            _, _, output_logits = model.step(sess, encoder_inputs, decoder_inputs,
-                                             target_weights, bucket_id, True)
-            # This is a greedy decoder - outputs are just argmaxes of output_logits.
-            outputs = [int(np.argmax(logit, axis=1)) for logit in output_logits]
-            # If there is an EOS symbol in outputs, cut them at that point.
-            if data_utils.EOS_ID in outputs:
-                outputs = outputs[:outputs.index(data_utils.EOS_ID)]
-            # Print out French sentence corresponding to outputs.
-            print(" ".join([rev_fr_vocab[output] for output in outputs]))
-            print("> ", end="")
-            sys.stdout.flush()
-            sentence = sys.stdin.readline()
-
-
-def self_test():
-    """Test the translation model."""
-
-    # TODO: FIX THIS
-    with tf.Session() as sess:
-        print("Self-test for neural translation model.")
-        # Create model with vocabularies of 10, 2 small buckets, 2 layers of 32.
-        model = seq2seq_model.Seq2SeqModel(10, 10, [(3, 3), (6, 6)], 32, 2,
-                                           5.0, 32, 0.3, 0.99, num_samples=8)
-        sess.run(tf.initialize_all_variables())
-
-        # Fake data set for both the (3, 3) and (6, 6) bucket.
-        data_set = ([([1, 1], [2, 2]), ([3, 3], [4]), ([5], [6])],
-                    [([1, 1, 1, 1, 1], [2, 2, 2, 2, 2]), ([3, 3, 3], [5, 6])])
-        for _ in xrange(5):  # Train the fake model for 5 steps.
-            bucket_id = random.choice([0, 1])
-            encoder_inputs, decoder_inputs, target_weights = model.get_batch(
-                data_set, bucket_id)
-            model.step(sess, encoder_inputs, decoder_inputs, target_weights,
-                       bucket_id, False)
+        np.savez(os.path.join(FLAGS.train_dir, 'decoded_states.npz'),
+                 states=np.vstack(all_states), labels=all_labels)
 
 
 def main(_):
-    if FLAGS.self_test:
-        self_test()
-    elif FLAGS.decode:
+    if FLAGS.decode:
         decode()
     else:
         train()

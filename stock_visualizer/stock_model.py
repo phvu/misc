@@ -9,6 +9,51 @@ import tensorflow as tf
 import utils
 
 
+def my_basic_rnn_seq2seq(encoder_inputs, decoder_inputs, cell, dtype=tf.float32, scope=None):
+  """Modified version of basic_rnn_seq2seq to get the encoder state
+  """
+  with tf.variable_scope(scope or "my_basic_rnn_seq2seq"):
+    _, enc_state = tf.nn.rnn(cell, encoder_inputs, dtype=dtype)
+    return tf.nn.seq2seq.rnn_decoder(decoder_inputs, enc_state, cell) + (enc_state, )
+
+
+def my_model_with_buckets(encoder_inputs, decoder_inputs, targets, weights,
+                          buckets, seq2seq, softmax_loss_function=None,
+                          per_example_loss=False, name=None):
+    """Improved version of model_with_buckets, to take the states
+    """
+    if len(encoder_inputs) < buckets[-1][0]:
+        raise ValueError("Length of encoder_inputs (%d) must be at least that of la"
+                         "st bucket (%d)." % (len(encoder_inputs), buckets[-1][0]))
+    if len(targets) < buckets[-1][1]:
+        raise ValueError("Length of targets (%d) must be at least that of last"
+                         "bucket (%d)." % (len(targets), buckets[-1][1]))
+    if len(weights) < buckets[-1][1]:
+        raise ValueError("Length of weights (%d) must be at least that of last"
+                         "bucket (%d)." % (len(weights), buckets[-1][1]))
+
+    all_inputs = encoder_inputs + decoder_inputs + targets + weights
+    losses = []
+    outputs = []
+    states = []
+    with tf.op_scope(all_inputs, name, "my_model_with_buckets"):
+        for j, bucket in enumerate(buckets):
+            with tf.variable_scope(tf.get_variable_scope(), reuse=True if j > 0 else None):
+                bucket_outputs, _, bucket_enc_state = seq2seq(encoder_inputs[:bucket[0]], decoder_inputs[:bucket[1]])
+                outputs.append(bucket_outputs)
+                states.append(bucket_enc_state)
+                if per_example_loss:
+                    losses.append(tf.nn.seq2seq.sequence_loss_by_example(
+                        outputs[-1], targets[:bucket[1]], weights[:bucket[1]],
+                        softmax_loss_function=softmax_loss_function))
+                else:
+                    losses.append(tf.nn.seq2seq.sequence_loss(
+                        outputs[-1], targets[:bucket[1]], weights[:bucket[1]],
+                        softmax_loss_function=softmax_loss_function))
+
+    return outputs, losses, states
+
+
 class Model(object):
     def __init__(self, data_dim, buckets, size,
                  num_layers, max_gradient_norm, batch_size, learning_rate,
@@ -68,7 +113,7 @@ class Model(object):
         # advances tasks should use embedding_attention_seq2seq
         # here we go with basic_rnn_seq2seq
         def seq2seq_f(encoder_inputs, decoder_inputs):
-            return tf.nn.seq2seq.basic_rnn_seq2seq(encoder_inputs, decoder_inputs, cell)
+            return my_basic_rnn_seq2seq(encoder_inputs, decoder_inputs, cell)
 
         # Feeds for inputs.
         self.encoder_inputs = []
@@ -89,7 +134,7 @@ class Model(object):
 
         # Training outputs and losses.
         if forward_only:
-            self.outputs, self.losses = tf.nn.seq2seq.model_with_buckets(
+            self.outputs, self.losses, self.states = my_model_with_buckets(
                 self.encoder_inputs, self.decoder_inputs, targets,
                 self.target_weights, buckets, seq2seq_f,
                 softmax_loss_function=l2_loss_function)
@@ -102,7 +147,7 @@ class Model(object):
                         for output in self.outputs[b]
                         ]
         else:
-            self.outputs, self.losses = tf.nn.seq2seq.model_with_buckets(
+            self.outputs, self.losses, self.states = my_model_with_buckets(
                 self.encoder_inputs, self.decoder_inputs, targets,
                 self.target_weights, buckets, seq2seq_f,
                 softmax_loss_function=l2_loss_function)
@@ -173,17 +218,17 @@ class Model(object):
                            self.gradient_norms[bucket_id],  # Gradient norm.
                            self.losses[bucket_id]]  # Loss for this batch.
         else:
-            output_feed = [self.losses[bucket_id]]  # Loss for this batch.
+            output_feed = [self.losses[bucket_id], self.states[bucket_id]]  # Loss for this batch.
             for l in range(decoder_size):  # Output logits.
                 output_feed.append(self.outputs[bucket_id][l])
 
         outputs = session.run(output_feed, input_feed)
         if not forward_only:
-            return outputs[1], outputs[2], None  # Gradient norm, loss, no outputs.
+            return outputs[1], outputs[2], None, None  # Gradient norm, loss, no outputs, no states.
         else:
-            return None, outputs[0], outputs[1:]  # No gradient norm, loss, outputs.
+            return None, outputs[0], outputs[2:], outputs[1]  # No gradient norm, loss, outputs, states.
 
-    def get_batch(self, data, bucket_id):
+    def get_batch(self, data, bucket_id, idx=None):
         """Get a random batch of data from the specified bucket, prepare for step.
 
         To feed data in step(..) it must be a list of batch-major vectors, while
@@ -205,7 +250,12 @@ class Model(object):
         # Get a random batch of encoder and decoder inputs from data,
         # pad them if needed, reverse encoder inputs and add GO to decoder.
         for _ in range(self.batch_size):
-            encoder_input, decoder_input = random.choice(data[bucket_id])
+
+            if idx is None:
+                encoder_input, decoder_input = random.choice(data[bucket_id])
+            else:
+                encoder_input, decoder_input = data[bucket_id][idx % len(data[bucket_id])]
+                idx += 1
 
             # Encoder inputs are padded and then reversed.
             if encoder_size > encoder_input.shape[0]:
@@ -245,4 +295,6 @@ class Model(object):
             batch_weights.append(np.array([weights[batch_idx][length_idx] for batch_idx in range(self.batch_size)],
                                           dtype=np.float32))
 
+        if idx is not None:
+            return batch_encoder_inputs, batch_decoder_inputs, batch_weights, idx
         return batch_encoder_inputs, batch_decoder_inputs, batch_weights
