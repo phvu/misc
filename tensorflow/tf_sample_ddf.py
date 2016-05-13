@@ -110,11 +110,11 @@ if __name__ == '__main__':
         pass
 
     q = Queue(20)
-    #server = six.text_type(input('Server address: '))
-    #port = int(six.text_type(input('Server port: ')))
-    #username = six.text_type(input('User name: '))
-    #passwd = six.text_type(input('Password: '))
-    server, port, username, passwd = 'test-pe.arimo.com', 16000, 'testbot@adatao.com', 'Abc123..'
+    server = six.text_type(input('Server address: '))
+    port = int(six.text_type(input('Server port: ')))
+    username = six.text_type(input('User name: '))
+    passwd = six.text_type(input('Password: '))
+
     ddf_uri = 'ddf://adatao/mtcars_tf'
 
     def get_batch(df):
