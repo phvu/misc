@@ -17,7 +17,7 @@ However, we believe Alluxio can do more than just pure storage. We built a proto
 
 Using Tachyon coprocessor, we can train Deep Learning models more efficiently [1]. The whole system is depicted in the following figure.
 
-![Alluxio coprocessor][1]
+<img src="alluxio_observer.png" title="Alluxio coprocessor" height="265" width="500" />
 
 The model parameters are stored as a file named *model.bin* in Alluxio, and the Spark workers read this model at the beginning of its task. Working on its own data partition, the Spark workers split the data into multiple small batches (of size typically 100-200 training samples), compute the error derivatives on each batch and store it back in a designated directory in Tachyon. To balance between the cost of computation and communication, the workers only send the accumulated derivatives after every n<sub>send</sub> iterations, and fetch the (new) model parameters from Tachyon every n<sub>fetch</sub> iterations.
 
@@ -35,7 +35,7 @@ Our contribution is two-fold:
 
 Obviously Alluxio can be used as a shared storage system, where all the Spark workers and driver write data to and read data from.
 
-![Alluxio as a shared storage system][2]
+<img src="alluxio_storage.png" title="Alluxio as a shared storage system" height="200" width="500" />
 
 In this architecture, before each map-reduce iteration, the driver writes the model to Alluxio, which will be read by the workers. The workers fetch the model, compute the gradient, and perform a reduce phase to produce the accumulated derivatives, which is also stored on Alluxio. The driver then read the accumulated derivatives, update the model and write the new model to Alluxio for the next iteration.
 
@@ -45,21 +45,16 @@ This is a traditional map-reduce approach for Gradient Descent on Spark. It is n
 
 In this architecture [2], we use the Parameter Server design pattern, computing gradients on the Spark workers and relaying them with the Parameter Server on the Spark Driver. Each map-reduce operation gives a partition of the dataset to each worker. Each worker computes gradients on the partition in minibatches and sends the gradients back to the Parameter Server, using an out-of-band communication channel such as HTTP or websockets. The Parameter Server combines the gradients and applies them to it’s copy of the model, which is then shared via the same communication channel with the workers. Such communication can be synchronous or asynchronous, each giving certain advantages and disadvantages. 
 
-![Tensorflow on Spark][3]
+<img src="tensorflow_1.png" title="Tensorflow on Spark" height="222" width="400" />
 
 The relevant TensorFlow functions here are *compute_gradients* for the workers and *apply_gradients* for the parameter server. Essentially, we take the gradient descent method, split it into two - “Compute Gradient” followed by “Apply Gradients (Descent)” and insert a network boundary between them.
 
-![Tensorflow on Spark][4]
+<img src="tensorflow_2.png" title="Tensorflow on Spark" height="196" width="400" />
 
 The driver and workers send and receive data via websockets.
 
 # References
 
-[1] [First-ever scalable, distributed deep learning architecture using Spark and Tachyon](http://conferences.oreilly.com/strata/big-data-conference-ny-2015/public/schedule/detail/43484), Strata+Hadoop World, Sept. 2015, New York.
+[1]: [First-ever scalable, distributed deep learning architecture using Spark and Tachyon](http://conferences.oreilly.com/strata/big-data-conference-ny-2015/public/schedule/detail/43484), Strata+Hadoop World, Sept. 2015, New York.
 
-[2] [Distributed TensorFlow on Spark: scaling Google's Deep Learning library](https://spark-summit.org/east-2016/events/distributed-tensor-flow-on-spark-scaling-googles-deep-learning-library/), Spark summit East, Feb. 2016, New York.
-
-[1]: http://abc.com/a.png
-[2]: http://abc.com/a.png
-[3]: http://abc.com/a.png
-[4]: http://abc.com/a.png
+[2]: [Distributed TensorFlow on Spark: scaling Google's Deep Learning library](https://spark-summit.org/east-2016/events/distributed-tensor-flow-on-spark-scaling-googles-deep-learning-library/), Spark summit East, Feb. 2016, New York.
