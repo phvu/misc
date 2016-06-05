@@ -20,9 +20,9 @@ def run(token):
         {'name': 'layers', 'type': 'int', 'bounds': {'min': 1, 'max': 3}},
         {'name': 'hidden_units', 'type': 'categorical',
          'categorical_values': [
-             {'enum_index': 1, 'name': 64, 'object': 'categorical_value'},
-             {'enum_index': 2, 'name': 128, 'object': 'categorical_value'},
-             {'enum_index': 3, 'name': 256, 'object': 'categorical_value'}
+             {'enum_index': 1, 'name': '64', 'object': 'categorical_value'},
+             {'enum_index': 2, 'name': '128', 'object': 'categorical_value'},
+             {'enum_index': 3, 'name': '256', 'object': 'categorical_value'}
          ]},
         {'name': 'input_dropout', 'type': 'double', 'bounds': {'min': 1, 'max': 3}},
         {'name': 'hidden_dropout', 'type': 'double', 'bounds': {'min': 1, 'max': 3}, 'precision': 4},
