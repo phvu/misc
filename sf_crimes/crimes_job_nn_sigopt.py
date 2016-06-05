@@ -24,12 +24,11 @@ def run(token):
              {'enum_index': 2, 'name': '128', 'object': 'categorical_value'},
              {'enum_index': 3, 'name': '256', 'object': 'categorical_value'}
          ]},
-        {'name': 'input_dropout', 'type': 'double', 'bounds': {'min': 1, 'max': 3}},
-        {'name': 'hidden_dropout', 'type': 'double', 'bounds': {'min': 1, 'max': 3}, 'precision': 4},
-        {'name': 'learning_rate', 'type': 'double', 'bounds': {'min': 1, 'max': 3}, 'precision': 4},
-        {'name': 'weight_decay', 'type': 'double', 'bounds': {'min': 1, 'max': 3}, 'precision': 4},
+        {'name': 'input_dropout', 'type': 'double', 'bounds': {'min': 0, 'max': 0.5}, 'precision': 4},
+        {'name': 'hidden_dropout', 'type': 'double', 'bounds': {'min': 0, 'max': 0.75}, 'precision': 4},
+        {'name': 'learning_rate', 'type': 'double', 'bounds': {'min': 0.01, 'max': 0.1}, 'precision': 4},
+        {'name': 'weight_decay', 'type': 'double', 'bounds': {'min': 0, 'max': 0.01}, 'precision': 4},
     ]
-
     experiment = conn.experiments().create(name='crimes_sf', parameters=params)
 
     trace = []
