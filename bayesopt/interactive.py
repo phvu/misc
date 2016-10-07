@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm as stats_norm
 
-from gaussian_process import GaussianProcess, SquaredDistanceKernel
+from gaussian_process import GaussianProcess, SquaredDistanceKernel, Matern52Kernel
 
 
 BOUNDS = [0, 10, -10, 10]
@@ -13,7 +13,8 @@ def func(v):
     return v * np.sin(v)
 
 
-gp = GaussianProcess(kernel=SquaredDistanceKernel(kernel_param=0.01), noise_variance=1E-3)
+# gp = GaussianProcess(kernel=SquaredDistanceKernel(kernel_param=0.01), noise_variance=1E-3)
+gp = GaussianProcess(kernel=Matern52Kernel(kernel_param=0.01), noise_variance=1E-3)
 
 fig = plt.figure()
 ax_data = fig.add_subplot(311)
