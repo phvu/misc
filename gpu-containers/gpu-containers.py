@@ -7,14 +7,20 @@ import cPickle as pickle
 import argparse
 from datetime import datetime
 from tabulate import tabulate
-from recordclass import recordclass
 
 
 DOCKER_BASE_URL = 'unix://var/run/docker.sock'
 STATUS_FILE = '/tmp/dockers/status.pkl'
 # STATUS_FILE = './status.pkl'
 
-DockerBlockEntry = recordclass('DockerBlockEntry', ('name', 'blocked_by', 'since', 'until'))
+
+class DockerBlockEntry(object):
+
+    def __init__(self, name, blocked_by, since, until):
+        self.name = name
+        self.blocked_by = blocked_by
+        self.since = since
+        self.until = until
 
 
 def block(args):
